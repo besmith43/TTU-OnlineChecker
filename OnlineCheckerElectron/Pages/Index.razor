@@ -1,0 +1,144 @@
+@page "/"
+
+@inject HostnameService HostService
+
+<h1>Hostnames Test</h1>
+
+<button type="button" class="btn btn-primary" @onclick="AddStaticHost">Add Default Test Host</button>
+
+<button type="button" class="btn btn-primary" @onclick="AddModalHost">Add Modal Host</button>
+
+<button type="button" class="btn btn-primary" @onclick="OpenHostFile">Open Host File</button>
+
+<br><br>
+
+@if(hostnames == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <!--
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Host Name</th>
+                <th>Status</th>
+                <th>IP Address</th>
+                <th>Origin</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var host in hostnames)
+            {
+                <tr>
+                    <td>@host.Hostname</td>
+                    <td style="@host._statusCSS">@host.Status</td>
+                    <td>@host.Address</td>
+                    <td>@host.Origin</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <br>
+    <br>
+    -->
+
+    <div class="flex-grid">
+        @foreach (var host in _clock.hostnames)
+        {
+            <div class="col">
+                <button class="card mb-3" style="padding: 20px; @host._statusCSS" @onclick="@(() => ShowHost(host))">@host.Hostname</button>
+            </div>
+        }
+    </div>
+}
+
+
+@code {
+    private List<ComputerHost> hostnames;
+
+    public Clock _clock;
+
+    [CascadingParameter] public IModalService Modal { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        hostnames = await HostService.GetTestDataAsync();
+        foreach(var host in hostnames)
+        {
+            host.PropertyChanged += (o, e) => StateHasChanged();
+        }
+        _clock = new(hostnames);
+        _clock.Tick();
+    }
+
+    private void AddStaticHost()
+    {
+        AddHost(new ComputerHost("www.anchor.fm", "Manual"));
+    }
+
+    private async Task AddModalHost()
+    {
+        var formModal = Modal.Show<NewHostModal>();
+        var result = await formModal.Result;
+
+        if (!result.Cancelled)
+        {
+            AddHost(new ComputerHost(result.Data.ToString(), "Manual"));
+        }
+    }
+
+    private void ShowHost(ComputerHost host)
+    {
+        var parameters = new ModalParameters();
+        parameters.Add(nameof(host), host);
+
+        Modal.Show<HostModalView>("View Host", parameters);
+    }
+
+    private async Task OpenHostFile()
+    {
+        var mainWindow = Electron.WindowManager.BrowserWindows.First();
+        var options = new OpenDialogOptions {
+            Properties = new OpenDialogProperty[] {
+                OpenDialogProperty.openFile
+            }
+        };
+
+        string[] files = await Electron.Dialog.ShowOpenDialogAsync(mainWindow, options);
+
+        foreach(var file in files)
+        {
+            ImportHostFromFile(file);
+        }
+    }
+
+    private void ImportHostFromFile(string filename)
+    {
+        if (System.IO.File.Exists(filename))
+        {
+            string[] lines = System.IO.File.ReadAllLines(filename);
+
+            Console.WriteLine("Contents of input file");
+
+            foreach (var line in lines)
+            {
+                Console.WriteLine($"{ line }");
+                AddHost(new ComputerHost(line, filename));
+            }
+        }
+        else
+        {
+            Console.WriteLine("Given File not found");
+        }
+    }
+
+    private void AddHost(ComputerHost tempHost)
+    {
+        tempHost.PropertyChanged += (o, e) => StateHasChanged();
+        tempHost.TestOnline();
+        _clock.hostnames.Add(tempHost);
+    }
+}

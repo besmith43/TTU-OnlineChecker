@@ -1,0 +1,16 @@
+<div>
+    <div>
+        <div>Hostname: @host.Hostname</div>
+        <div>Status: @host.Status</div>
+        <div>IP Address: @host.Address</div>
+        <div>Origin: @host.Origin</div>
+    </div>
+    <br><br>
+    <button @onclick="BlazoredModal.Cancel" class="btn btn-secondary">Close</button>
+</div>
+
+@code {
+    [CascadingParameter] BlazoredModalInstance BlazoredModal { get; set; }
+
+    [Parameter] public ComputerHost host { get; set; }
+}
